@@ -6,11 +6,8 @@ import (
 	"unsafe"
 )
 
-// An interned string value.
+// An interned string value from some Context.
 type S uint32
-
-var internST = unsafe.Pointer(&s0)
-var s0 = state{m: map[string]S{"": 0}, r: []string{""}}
 
 type state struct {
 	m map[string]S
@@ -18,10 +15,14 @@ type state struct {
 	c S
 }
 
+type Context struct {
+	p unsafe.Pointer
+}
+
 // Intern a string.
-func Intern(s string) S {
+func (c Context) Intern(s string) S {
 bset:
-	ptr := atomic.LoadPointer(&internST)
+	ptr := atomic.LoadPointer(&c.p)
 	st := (*state)(ptr)
 	v, ok := st.m[s]
 	if !ok {
@@ -33,7 +34,7 @@ bset:
 		x.c++
 		x.m[s] = x.c
 		x.r = append(x.r, s)
-		if !atomic.CompareAndSwapPointer(&internST, ptr, unsafe.Pointer(&x)) {
+		if !atomic.CompareAndSwapPointer(&c.p, ptr, unsafe.Pointer(&x)) {
 			goto bset
 		}
 	}
@@ -41,10 +42,10 @@ bset:
 }
 
 // Intern all strings aggregating the write.
-func InternAll(ss []string) []S {
+func (c Context) InternAll(ss []string) []S {
 	res := make([]S, len(ss))
 bset:
-	ptr := atomic.LoadPointer(&internST)
+	ptr := atomic.LoadPointer(&c.p)
 	st := (*state)(ptr)
 	var x *state
 	for i, s := range ss {
@@ -65,14 +66,23 @@ bset:
 		x.m[s] = x.c
 		x.r = append(x.r, s)
 	}
-	if x != nil && !atomic.CompareAndSwapPointer(&internST, ptr, unsafe.Pointer(&x)) {
+	if x != nil && !atomic.CompareAndSwapPointer(&c.p, ptr, unsafe.Pointer(&x)) {
 		goto bset
 	}
 	return res
 }
 
 // Return the string corresponding to an interned string.
-func (v S) String() string {
-	st := (*state)(atomic.LoadPointer(&internST))
+func (c Context) String(v S) string {
+	st := (*state)(atomic.LoadPointer(&c.p))
 	return st.r[v]
+}
+
+// Create a new Context.
+func NewContext() Context {
+	const s = 4096
+	mm := make(map[string]S, s)
+	mm[""] = 0
+	st := &state{m: mm, r: make([]string, 1, s)}
+	return Context{unsafe.Pointer(st)}
 }
