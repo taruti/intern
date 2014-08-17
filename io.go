@@ -43,7 +43,7 @@ func ReadContext(rawrd io.Reader) (Context, error) {
 		line, _, err := rd.ReadLine()
 		if err != nil {
 			if err == io.EOF {
-				return Context{unsafe.Pointer(&st)}, nil
+				return Context{unsafe.Pointer(st)}, nil
 			}
 			return Context{}, err
 		}
