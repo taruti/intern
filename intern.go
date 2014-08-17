@@ -31,9 +31,7 @@ bset:
 		for k, v := range st.m {
 			x.m[k] = v
 		}
-		x.c++
-		x.m[s] = x.c
-		x.r = append(x.r, s)
+		x.addMissing(s)
 		if !atomic.CompareAndSwapPointer(&c.p, ptr, unsafe.Pointer(&x)) {
 			goto bset
 		}
@@ -62,14 +60,18 @@ bset:
 				x.m[k] = v
 			}
 		}
-		x.c++
-		x.m[s] = x.c
-		x.r = append(x.r, s)
+		x.addMissing(s)
 	}
 	if x != nil && !atomic.CompareAndSwapPointer(&c.p, ptr, unsafe.Pointer(&x)) {
 		goto bset
 	}
 	return res
+}
+
+func (st *state) addMissing(s string) {
+	st.c++
+	st.m[s] = st.c
+	st.r = append(st.r, s)
 }
 
 // Return the string corresponding to an interned string.
@@ -80,9 +82,12 @@ func (c Context) String(v S) string {
 
 // Create a new Context.
 func NewContext() Context {
+	return Context{unsafe.Pointer(newst())}
+}
+
+func newst() *state {
 	const s = 4096
 	mm := make(map[string]S, s)
 	mm[""] = 0
-	st := &state{m: mm, r: make([]string, 1, s)}
-	return Context{unsafe.Pointer(st)}
+	return &state{m: mm, r: make([]string, 1, s)}
 }
