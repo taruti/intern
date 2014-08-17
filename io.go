@@ -14,8 +14,10 @@ type sbwriter interface {
 
 func (ctx *Context) WriteTo(rawwr io.Writer) error {
 	w, ok := rawwr.(sbwriter)
+	var bwr *bufio.Writer
 	if !ok {
-		w = bufio.NewWriter(rawwr)
+		bwr = bufio.NewWriter(rawwr)
+		w = bwr
 	}
 	c := (*state)(atomic.LoadPointer(&ctx.p))
 	for _, s := range c.r {
@@ -27,6 +29,9 @@ func (ctx *Context) WriteTo(rawwr io.Writer) error {
 		if e != nil {
 			return e
 		}
+	}
+	if bwr != nil {
+		return bwr.Flush()
 	}
 	return nil
 }

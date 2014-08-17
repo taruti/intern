@@ -20,7 +20,7 @@ type Context struct {
 }
 
 // Intern a string.
-func (c Context) Intern(s string) S {
+func (c *Context) Intern(s string) S {
 bset:
 	ptr := atomic.LoadPointer(&c.p)
 	st := (*state)(ptr)
@@ -40,32 +40,32 @@ bset:
 }
 
 // Intern all strings aggregating the write.
-func (c Context) InternAll(ss []string) []S {
-	res := make([]S, len(ss))
+func (c *Context) InternAll(ss []string, mayberes []S) {
 bset:
 	ptr := atomic.LoadPointer(&c.p)
 	st := (*state)(ptr)
-	var x *state
+	var newstptr *state
 	for i, s := range ss {
 		v, ok := st.m[s]
 		if ok {
-			res[i] = v
+			if mayberes != nil {
+				mayberes[i] = v
+			}
 			continue
 		}
-		if x == nil {
-			x = new(state)
-			*x = *st
-			x.m = make(map[string]S, len(st.m))
+		if newstptr == nil {
+			newstptr = new(state)
+			*newstptr = *st
+			newstptr.m = make(map[string]S, len(st.m))
 			for k, v := range st.m {
-				x.m[k] = v
+				newstptr.m[k] = v
 			}
 		}
-		x.addMissing(s)
+		newstptr.addMissing(s)
 	}
-	if x != nil && !atomic.CompareAndSwapPointer(&c.p, ptr, unsafe.Pointer(&x)) {
+	if newstptr != nil && !atomic.CompareAndSwapPointer(&c.p, ptr, unsafe.Pointer(newstptr)) {
 		goto bset
 	}
-	return res
 }
 
 func (st *state) addMissing(s string) {
@@ -75,7 +75,7 @@ func (st *state) addMissing(s string) {
 }
 
 // Return the string corresponding to an interned string.
-func (c Context) String(v S) string {
+func (c *Context) String(v S) string {
 	st := (*state)(atomic.LoadPointer(&c.p))
 	return st.r[v]
 }

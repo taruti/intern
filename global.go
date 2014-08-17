@@ -13,10 +13,13 @@ func Intern(s string) Global {
 }
 
 // Intern strings in the global table.
-func InternAll(ss []string) []Global {
-	raw := internST.InternAll(ss)
-	res := *(*[]Global)(unsafe.Pointer(&raw))
-	return res
+func InternAll(ss []string, mayberes []Global) {
+	if mayberes == nil {
+		internST.InternAll(ss, nil)
+	} else {
+		res := *(*[]S)(unsafe.Pointer(&mayberes))
+		internST.InternAll(ss, res)
+	}
 }
 
 func (g Global) String() string {
